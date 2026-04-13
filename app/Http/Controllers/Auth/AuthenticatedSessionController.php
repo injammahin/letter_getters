@@ -24,14 +24,19 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
+        return redirect()->intended($this->redirectToByRole($user));
+    }
+
+    protected function redirectToByRole($user): string
+    {
         return match ($user->role) {
-            'superadmin', 'admin' => redirect()->intended(route('admin.dashboard')),
+            'superadmin', 'admin' => route('admin.dashboard'),
+            'adult' => route('adult.dashboard'),
+            'parent' => route('parent.dashboard'),
             'child' => $user->hasCompletedChildProfile()
-                ? redirect()->intended(route('child.dashboard'))
-                : redirect()->intended(route('child.profile.complete')),
-            'adult' => redirect()->intended(route('adult.dashboard')),
-            'parent' => redirect()->intended(route('parent.dashboard')),
-            default => redirect()->intended(route('dashboard')),
+                ? route('child.dashboard')
+                : route('child.profile.complete'),
+            default => route('home'),
         };
     }
 

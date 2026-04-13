@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Child;
 
 use App\Http\Controllers\Controller;
+use App\Models\ChildAvatar;
 use App\Models\Interest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,22 +15,20 @@ class ChildProfileController extends Controller
     public function edit(): View
     {
         $user = auth()->user();
+
         $interests = Interest::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
 
-        $presetAvatars = [
-            ['key' => 'rocket', 'emoji' => '🚀', 'label' => 'Rocket'],
-            ['key' => 'star', 'emoji' => '⭐', 'label' => 'Star'],
-            ['key' => 'tiger', 'emoji' => '🐯', 'label' => 'Tiger'],
-            ['key' => 'panda', 'emoji' => '🐼', 'label' => 'Panda'],
-            ['key' => 'unicorn', 'emoji' => '🦄', 'label' => 'Unicorn'],
-            ['key' => 'planet', 'emoji' => '🪐', 'label' => 'Planet'],
-        ];
+        $avatars = ChildAvatar::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
 
-        return view('child.profile-complete', compact('user', 'interests', 'presetAvatars'));
+        return view('child.profile-complete', compact('user', 'interests', 'avatars'));
     }
 
     public function update(Request $request): RedirectResponse
@@ -43,16 +42,16 @@ class ChildProfileController extends Controller
             'state' => ['required', 'string', 'max:120'],
             'short_bio' => ['nullable', 'string', 'max:500'],
             'favorite_color' => ['nullable', 'string', 'max:30'],
-            'avatar_mode' => ['required', 'in:preset,upload'],
-            'avatar_preset' => ['nullable', 'string', 'in:rocket,star,tiger,panda,unicorn,planet'],
+            'avatar_mode' => ['required', 'in:library,upload'],
+            'avatar_library_id' => ['nullable', 'exists:child_avatars,id'],
             'avatar_upload' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'interests' => ['required', 'array', 'min:1'],
             'interests.*' => ['exists:interests,id'],
         ]);
 
-        if ($data['avatar_mode'] === 'preset' && empty($data['avatar_preset'])) {
+        if ($data['avatar_mode'] === 'library' && empty($data['avatar_library_id'])) {
             return back()->withErrors([
-                'avatar_preset' => 'Please choose an avatar.',
+                'avatar_library_id' => 'Please choose an avatar.',
             ])->withInput();
         }
 
@@ -71,13 +70,14 @@ class ChildProfileController extends Controller
         $profile->short_bio = $data['short_bio'] ?? null;
         $profile->favorite_color = $data['favorite_color'] ?? null;
 
-        if ($data['avatar_mode'] === 'preset') {
+        if ($data['avatar_mode'] === 'library') {
             if ($profile->avatar_type === 'upload' && filled($profile->avatar)) {
                 Storage::disk('public')->delete($profile->avatar);
             }
 
-            $profile->avatar_type = 'preset';
-            $profile->avatar = $data['avatar_preset'];
+            $profile->avatar_type = 'library';
+            $profile->avatar_library_id = (int) $data['avatar_library_id'];
+            $profile->avatar = null;
         } else {
             if ($request->hasFile('avatar_upload')) {
                 if ($profile->avatar_type === 'upload' && filled($profile->avatar)) {
@@ -85,7 +85,9 @@ class ChildProfileController extends Controller
                 }
 
                 $path = $request->file('avatar_upload')->store('avatars/children', 'public');
+
                 $profile->avatar_type = 'upload';
+                $profile->avatar_library_id = null;
                 $profile->avatar = $path;
             }
         }

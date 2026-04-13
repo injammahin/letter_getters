@@ -19,6 +19,7 @@ class User extends Authenticatable
         'role',
         'account_status',
         'parent_email',
+        'email_verified_at',
     ];
 
     protected $hidden = [
@@ -52,10 +53,32 @@ class User extends Authenticatable
 
         $profile = $this->profile;
 
-        return $profile
-            && filled($profile->avatar)
-            && filled($profile->avatar_type)
-            && !is_null($profile->profile_completed_at)
-            && $this->interests()->exists();
+        if (! $profile) {
+            return false;
+        }
+
+        $hasAvatar = false;
+
+        if ($profile->avatar_type === 'upload' && filled($profile->avatar)) {
+            $hasAvatar = true;
+        }
+
+        if ($profile->avatar_type === 'library' && ! is_null($profile->avatar_library_id)) {
+            $hasAvatar = true;
+        }
+
+        $hasBasicInfo =
+            filled($profile->display_name) &&
+            filled($profile->age_or_grade) &&
+            filled($profile->city) &&
+            filled($profile->state) &&
+            filled($profile->short_bio);
+
+        $hasInterests = $this->interests()->exists();
+
+        return $hasAvatar
+            && $hasBasicInfo
+            && $hasInterests
+            && ! is_null($profile->profile_completed_at);
     }
 }

@@ -93,6 +93,16 @@
                 <span x-show="!desktopCollapsed" x-cloak>Interests</span>
             </a>
 
+            <a
+                href="{{ route('admin.child-avatars.index') }}"
+                @click="mobileSidebar = false"
+                class="admin-menu-link flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/child-avatars*') ? 'admin-menu-link-active' : 'text-black/75' }}"
+                :class="desktopCollapsed ? 'justify-center' : ''"
+            >
+                <i class="fa-solid fa-image-portrait text-base"></i>
+                <span x-show="!desktopCollapsed" x-cloak>Child Avatars</span>
+            </a>
+
             <div x-data="{ open: {{ request()->is('admin/mail*') ? 'true' : 'false' }} }" class="rounded-2xl">
                 <button
                     type="button"

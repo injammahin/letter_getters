@@ -15,6 +15,7 @@ class Profile extends Model
         'short_bio',
         'avatar',
         'avatar_type',
+        'avatar_library_id',
         'favorite_color',
         'profile_completed_at',
     ];
@@ -26,5 +27,10 @@ class Profile extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function avatarLibrary()
+    {
+        return $this->belongsTo(ChildAvatar::class, 'avatar_library_id');
     }
 }

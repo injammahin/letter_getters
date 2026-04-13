@@ -8,15 +8,13 @@ use App\Models\Interest;
 use App\Models\ParentApproval;
 use App\Models\Profile;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use Illuminate\Support\Str;
 
 class RegisteredUserController extends Controller
 {
@@ -67,6 +65,7 @@ class RegisteredUserController extends Controller
             'role' => $data['role'],
             'account_status' => $data['role'] === 'child' ? 'pending_parent_approval' : 'active',
             'parent_email' => $data['role'] === 'child' ? $data['parent_email'] : null,
+            'email_verified_at' => null,
         ]);
 
         Profile::create([
@@ -100,9 +99,15 @@ class RegisteredUserController extends Controller
                 ->with('child_name', $user->name);
         }
 
-        event(new Registered($user));
-        Auth::login($user);
+        if ($data['role'] === 'adult') {
+            $user->sendEmailVerificationNotification();
 
-        return redirect()->route('adult.dashboard');
+            return redirect()
+                ->route('verification.notice')
+                ->with('verification_email', $user->email)
+                ->with('success', 'Account created. Please verify your email before signing in.');
+        }
+
+        return redirect()->route('login');
     }
 }

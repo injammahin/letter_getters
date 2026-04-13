@@ -32,12 +32,11 @@ class LoginRequest extends FormRequest
 
         $login = $this->input('login');
         $password = $this->input('password');
+
         $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
 
         $user = User::where($field, $login)->first();
 
-        // If credentials are correct but child is still waiting for parent approval,
-        // show a clear message and do not log in.
         if ($user && Hash::check($password, $user->password)) {
             if ($user->account_status === 'pending_parent_approval') {
                 throw ValidationException::withMessages([
@@ -48,6 +47,12 @@ class LoginRequest extends FormRequest
             if ($user->account_status !== 'active') {
                 throw ValidationException::withMessages([
                     'login' => 'Your account is not active yet. Please contact support.',
+                ]);
+            }
+
+            if ($user->role === 'adult' && is_null($user->email_verified_at)) {
+                throw ValidationException::withMessages([
+                    'login' => 'Please verify your email address before signing in.',
                 ]);
             }
         }

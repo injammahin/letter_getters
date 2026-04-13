@@ -123,14 +123,15 @@
                             @click="profileOpen = !profileOpen; notificationOpen = false"
                             class="flex items-center gap-3 rounded-2xl border border-black/10 bg-white px-3 py-2"
                         >
-                            @if($childProfile?->avatar_type === 'upload' && $childProfile?->avatar)
+                           @if($childProfile?->avatar_type === 'upload' && $childProfile?->avatar)
                                 <img src="{{ asset('storage/'.$childProfile->avatar) }}" alt="Avatar" class="h-11 w-11 rounded-2xl object-cover">
+                            @elseif($childProfile?->avatar_type === 'library' && $childProfile?->avatarLibrary?->image_path)
+                                <img src="{{ asset('storage/'.$childProfile->avatarLibrary->image_path) }}" alt="Avatar" class="h-11 w-11 rounded-2xl object-cover">
                             @else
-                                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br {{ $avatarPreset['bg'] }} text-lg text-white shadow">
-                                    {{ $avatarPreset['emoji'] }}
+                                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#CB148B,#620A88)] text-white shadow-sm">
+                                    <i class="fa-solid fa-user"></i>
                                 </div>
                             @endif
-
                             <div class="hidden text-left sm:block">
                                 <div class="text-sm font-bold text-black">{{ $childUser?->name }}</div>
                                 <div class="text-xs text-black/45">Child Account</div>
