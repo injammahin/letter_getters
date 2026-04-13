@@ -83,24 +83,52 @@
                     <a href="{{ url('/admin/matches/history') }}" class="admin-submenu-link block text-sm text-black/60">Match History</a>
                 </div>
             </div>
-            <a
-                href="{{ route('admin.interests.index') }}"
-                @click="mobileSidebar = false"
-                class="admin-menu-link flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/interests*') ? 'admin-menu-link-active' : 'text-black/75' }}"
-                :class="desktopCollapsed ? 'justify-center' : ''"
-            >
-                <i class="fa-solid fa-shapes text-base"></i>
-                <span x-show="!desktopCollapsed" x-cloak>Interests</span>
-            </a>
+            
+            <div x-data="{ open: {{ request()->is('admin/interests*') || request()->is('admin/child-avatars*') ? 'true' : 'false' }} }" class="rounded-2xl">
+                <button
+                    type="button"
+                    @click="if (desktopCollapsed) { desktopCollapsed = false } else { open = !open }"
+                    class="admin-menu-link flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/interests*') || request()->is('admin/child-avatars*') ? 'admin-menu-link-active' : 'text-black/75' }}"
+                    :class="desktopCollapsed ? 'justify-center' : 'justify-between'"
+                >
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-layer-group text-base"></i>
+                        <span x-show="!desktopCollapsed" x-cloak>App Management</span>
+                    </div>
 
+                    <i
+                        x-show="!desktopCollapsed"
+                        x-cloak
+                        class="fa-solid fa-chevron-down text-xs transition"
+                        :class="open ? 'rotate-180' : ''"
+                    ></i>
+                </button>
+
+                <div x-show="open && !desktopCollapsed" x-cloak class="mt-2 space-y-2 pl-11 pr-3">
+                    <a
+                        href="{{ route('admin.interests.index') }}"
+                        class="admin-submenu-link block text-sm {{ request()->is('admin/interests*') ? 'admin-submenu-link-active' : 'text-black/60' }}"
+                    >
+                        Interests
+                    </a>
+
+                    <a
+                        href="{{ route('admin.child-avatars.index') }}"
+                        class="admin-submenu-link block text-sm {{ request()->is('admin/child-avatars*') ? 'admin-submenu-link-active' : 'text-black/60' }}"
+                    >
+                        Child Avatars
+                    </a>
+                </div>
+            </div>
+            
             <a
-                href="{{ route('admin.child-avatars.index') }}"
+                href="{{ route('admin.support-tickets.index') }}"
                 @click="mobileSidebar = false"
-                class="admin-menu-link flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/child-avatars*') ? 'admin-menu-link-active' : 'text-black/75' }}"
+                class="admin-menu-link flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/support-tickets*') ? 'admin-menu-link-active' : 'text-black/75' }}"
                 :class="desktopCollapsed ? 'justify-center' : ''"
             >
-                <i class="fa-solid fa-image-portrait text-base"></i>
-                <span x-show="!desktopCollapsed" x-cloak>Child Avatars</span>
+                <i class="fa-solid fa-life-ring text-base"></i>
+                <span x-show="!desktopCollapsed" x-cloak>Support Tickets</span>
             </a>
 
             <div x-data="{ open: {{ request()->is('admin/mail*') ? 'true' : 'false' }} }" class="rounded-2xl">

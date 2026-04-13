@@ -8,11 +8,30 @@ use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\ParentApprovalController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\Child\ChildProfileController;
+use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\Admin\AdminSupportTicketController;
+
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('home');
 })->name('home');
+
+Route::get('/how-it-works', function () {
+    return view('pages.how-it-works');
+})->name('how-it-works');
+
+Route::get('/pathways', function () {
+    return view('pages.pathways');
+})->name('pathways');
+
+Route::get('/safety', function () {
+    return view('pages.safety');
+})->name('safety');
+
+Route::get('/subscription', function () {
+    return view('pages.subscription');
+})->name('subscription');
 
 Route::get('/verify-email', function () {
     return view('auth.verify-email');
@@ -35,6 +54,9 @@ Route::get('/parent/approve/{token}', [ParentApprovalController::class, 'show'])
 
 Route::post('/parent/approve/{token}', [ParentApprovalController::class, 'store'])
     ->name('parent.approval.store');
+
+Route::get('/support', [SupportTicketController::class, 'create'])->name('support');
+Route::post('/support', [SupportTicketController::class, 'store'])->name('support.store');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
@@ -99,6 +121,12 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('/parents-children', [AdminParentChildLinkController::class, 'index'])->name('parents-children.index');
         Route::delete('/parents-children/{parentChildLink}', [AdminParentChildLinkController::class, 'destroy'])->name('parents-children.destroy');
+
+        // support-ticket
+        Route::get('/support-tickets', [AdminSupportTicketController::class, 'index'])->name('support-tickets.index');
+        Route::get('/support-tickets/{supportTicket}', [AdminSupportTicketController::class, 'show'])->name('support-tickets.show');
+        Route::post('/support-tickets/{supportTicket}/reply', [AdminSupportTicketController::class, 'reply'])->name('support-tickets.reply');
+        Route::patch('/support-tickets/{supportTicket}/status', [AdminSupportTicketController::class, 'updateStatus'])->name('support-tickets.update-status');
     });
 });
 

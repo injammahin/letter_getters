@@ -134,7 +134,7 @@
 <body class="min-h-screen antialiased">
     @include('partials.guest-header')
 
-    <main>
+    <main class="pt-28 sm:pt-32">
         @yield('content')
     </main>
 
