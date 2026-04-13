@@ -12,6 +12,7 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -21,7 +22,7 @@ class RegisteredUserController extends Controller
 {
     public function create(): View
     {
-        $interests = \App\Models\Interest::query()
+        $interests = Interest::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -62,7 +63,7 @@ class RegisteredUserController extends Controller
             'name' => $data['display_name'],
             'username' => $data['username'],
             'email' => $data['email'],
-            'password' => $data['password'],
+            'password' => Hash::make($data['password']),
             'role' => $data['role'],
             'account_status' => $data['role'] === 'child' ? 'pending_parent_approval' : 'active',
             'parent_email' => $data['role'] === 'child' ? $data['parent_email'] : null,

@@ -44,4 +44,18 @@ class User extends Authenticatable
     {
         return $this->hasMany(ParentApproval::class, 'child_user_id');
     }
+    public function hasCompletedChildProfile(): bool
+    {
+        if ($this->role !== 'child') {
+            return true;
+        }
+
+        $profile = $this->profile;
+
+        return $profile
+            && filled($profile->avatar)
+            && filled($profile->avatar_type)
+            && !is_null($profile->profile_completed_at)
+            && $this->interests()->exists();
+    }
 }

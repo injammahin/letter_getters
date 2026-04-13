@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\InterestController;
 use App\Http\Controllers\Auth\ParentApprovalController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Child\ChildProfileController;
 
 Route::get('/', function () {
     return view('home');
@@ -34,6 +35,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/parent/dashboard', function () {
         return view('parent.dashboard');
     })->name('parent.dashboard');
+    
+     Route::prefix('child')->name('child.')->group(function () {
+        Route::get('/complete-profile', [ChildProfileController::class, 'edit'])->name('profile.complete');
+        Route::post('/complete-profile', [ChildProfileController::class, 'update'])->name('profile.store');
+
+        Route::middleware(['child.profile.completed'])->group(function () {
+            Route::get('/dashboard', function () {
+                return view('child.dashboard');
+            })->name('dashboard');
+        });
+    });
 
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::resource('interests', InterestController::class);

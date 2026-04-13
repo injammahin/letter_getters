@@ -14,6 +14,13 @@ class Profile extends Model
         'state',
         'short_bio',
         'avatar',
+        'avatar_type',
+        'favorite_color',
+        'profile_completed_at',
+    ];
+
+    protected $casts = [
+        'profile_completed_at' => 'datetime',
     ];
 
     public function user()
