@@ -94,12 +94,32 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/complete-profile', [ChildProfileController::class, 'update'])->name('profile.store');
 
         Route::middleware(['child.profile.completed'])->group(function () {
-            Route::get('/dashboard', function () {
-                return view('child.dashboard');
-            })->name('dashboard');
+            Route::get('/dashboard', [\App\Http\Controllers\Child\ChildDashboardController::class, 'index'])->name('dashboard');
 
-            Route::view('/pen-pals', 'child.pen-pals')->name('pen-pals');
-            Route::view('/letters', 'child.letters')->name('letters');
+            Route::get('/pen-pals', [\App\Http\Controllers\Child\ChildPenPalController::class, 'index'])->name('pen-pals');
+            Route::post('/pen-pals/{targetUser}/request', [\App\Http\Controllers\Child\ChildPenPalController::class, 'sendRequest'])->name('pen-pals.request');
+
+            Route::get('/messages/{penPal}', [\App\Http\Controllers\Child\ChildChatController::class, 'show'])->name('messages.chat');
+            Route::post('/messages/{penPal}', [\App\Http\Controllers\Child\ChildChatController::class, 'store'])->name('messages.send');
+
+            Route::get('/letters', [\App\Http\Controllers\Child\ChildLetterController::class, 'index'])->name('letters');
+            Route::get('/letters/{penPal}/create', [\App\Http\Controllers\Child\ChildLetterController::class, 'create'])->name('letters.create');
+            Route::post('/letters/{penPal}', [\App\Http\Controllers\Child\ChildLetterController::class, 'store'])->name('letters.store');
+            Route::get('/letters/view/{childLetter}', [\App\Http\Controllers\Child\ChildLetterController::class, 'show'])->name('letters.show');
+
+            Route::get('/shop', [\App\Http\Controllers\Child\ChildShopController::class, 'index'])->name('shop');
+            Route::get('/shop/products/{product}', [\App\Http\Controllers\Child\ChildShopController::class, 'show'])->name('store.products.show');
+
+            Route::get('/cart', [\App\Http\Controllers\Child\ChildCartController::class, 'index'])->name('store.cart.index');
+            Route::post('/cart/{product}', [\App\Http\Controllers\Child\ChildCartController::class, 'store'])->name('store.cart.store');
+            Route::patch('/cart/{cartItem}', [\App\Http\Controllers\Child\ChildCartController::class, 'update'])->name('store.cart.update');
+            Route::delete('/cart/{cartItem}', [\App\Http\Controllers\Child\ChildCartController::class, 'destroy'])->name('store.cart.destroy');
+
+            Route::get('/checkout', [\App\Http\Controllers\Child\ChildCheckoutController::class, 'create'])->name('store.checkout');
+            Route::post('/checkout', [\App\Http\Controllers\Child\ChildCheckoutController::class, 'store'])->name('store.checkout.store');
+
+            Route::get('/orders', [\App\Http\Controllers\Child\ChildOrderController::class, 'index'])->name('store.orders.index');
+            Route::get('/orders/{order}', [\App\Http\Controllers\Child\ChildOrderController::class, 'show'])->name('store.orders.show');
             Route::view('/rewards', 'child.rewards')->name('rewards');
             Route::view('/printables', 'child.printables')->name('printables');
             Route::view('/safety', 'child.safety')->name('safety');
@@ -127,6 +147,49 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/support-tickets/{supportTicket}', [AdminSupportTicketController::class, 'show'])->name('support-tickets.show');
         Route::post('/support-tickets/{supportTicket}/reply', [AdminSupportTicketController::class, 'reply'])->name('support-tickets.reply');
         Route::patch('/support-tickets/{supportTicket}/status', [AdminSupportTicketController::class, 'updateStatus'])->name('support-tickets.update-status');
+        // admin-match
+        Route::get('/matches/pending', [\App\Http\Controllers\Admin\AdminChildMatchController::class, 'pending'])->name('matches.pending');
+        Route::get('/matches/approved', [\App\Http\Controllers\Admin\AdminChildMatchController::class, 'approved'])->name('matches.approved');
+        Route::patch('/matches/requests/{childMatchRequest}/approve', [\App\Http\Controllers\Admin\AdminChildMatchController::class, 'approve'])->name('matches.approve');
+        Route::patch('/matches/requests/{childMatchRequest}/reject', [\App\Http\Controllers\Admin\AdminChildMatchController::class, 'reject'])->name('matches.reject');
+        Route::patch('/matches/{childMatch}/remove', [\App\Http\Controllers\Admin\AdminChildMatchController::class, 'remove'])->name('matches.remove');
+        // letter
+        Route::get('/mail/letters/pending', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'pending'])->name('child-letters.pending');
+        Route::get('/mail/letters/approved', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'approved'])->name('child-letters.approved');
+        Route::get('/mail/letters/rejected', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'rejected'])->name('child-letters.rejected');
+
+        Route::patch('/mail/letters/scan-all/submitted', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'scanAllSubmitted'])->name('child-letters.scan-all');
+        Route::patch('/mail/letters/approve-all/clean-submitted', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'approveAllCleanSubmitted'])->name('child-letters.approve-all-clean');
+
+        Route::get('/mail/letters/{childLetter}', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'show'])->name('child-letters.show');
+        Route::patch('/mail/letters/{childLetter}/scan', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'scan'])->name('child-letters.scan');
+        Route::patch('/mail/letters/{childLetter}/approve', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'approve'])->name('child-letters.approve');
+        Route::patch('/mail/letters/{childLetter}/force-approve', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'forceApprove'])->name('child-letters.force-approve');
+        Route::patch('/mail/letters/{childLetter}/reject', [\App\Http\Controllers\Admin\AdminChildLetterController::class, 'reject'])->name('child-letters.reject');
+
+        // store
+        Route::get('/store/categories', [\App\Http\Controllers\Admin\AdminProductCategoryController::class, 'index'])->name('store.categories.index');
+        Route::post('/store/categories', [\App\Http\Controllers\Admin\AdminProductCategoryController::class, 'store'])->name('store.categories.store');
+        Route::get('/store/categories/{category}/edit', [\App\Http\Controllers\Admin\AdminProductCategoryController::class, 'edit'])->name('store.categories.edit');
+        Route::patch('/store/categories/{category}', [\App\Http\Controllers\Admin\AdminProductCategoryController::class, 'update'])->name('store.categories.update');
+        Route::delete('/store/categories/{category}', [\App\Http\Controllers\Admin\AdminProductCategoryController::class, 'destroy'])->name('store.categories.destroy');
+
+        Route::get('/store/products', [\App\Http\Controllers\Admin\AdminProductController::class, 'index'])->name('store.products.index');
+        Route::get('/store/products/create', [\App\Http\Controllers\Admin\AdminProductController::class, 'create'])->name('store.products.create');
+        Route::post('/store/products', [\App\Http\Controllers\Admin\AdminProductController::class, 'store'])->name('store.products.store');
+        Route::get('/store/products/{product}/edit', [\App\Http\Controllers\Admin\AdminProductController::class, 'edit'])->name('store.products.edit');
+        Route::patch('/store/products/{product}', [\App\Http\Controllers\Admin\AdminProductController::class, 'update'])->name('store.products.update');
+        Route::delete('/store/products/{product}', [\App\Http\Controllers\Admin\AdminProductController::class, 'destroy'])->name('store.products.destroy');
+
+        Route::get('/store/orders', [\App\Http\Controllers\Admin\AdminOrderController::class, 'index'])->name('store.orders.index');
+        Route::get('/store/orders/{order}', [\App\Http\Controllers\Admin\AdminOrderController::class, 'show'])->name('store.orders.show');
+        Route::patch('/store/orders/{order}/status', [\App\Http\Controllers\Admin\AdminOrderController::class, 'updateStatus'])->name('store.orders.update-status');
+        Route::patch('/store/orders/{order}/shipment', [\App\Http\Controllers\Admin\AdminOrderController::class, 'updateShipment'])->name('store.orders.update-shipment');
+
+        Route::get('/store/shipping', [\App\Http\Controllers\Admin\AdminShipmentController::class, 'index'])->name('store.shipping.index');
+
+        Route::get('/store/inventory', [\App\Http\Controllers\Admin\AdminInventoryController::class, 'index'])->name('store.inventory.index');
+        Route::patch('/store/inventory/{product}/adjust', [\App\Http\Controllers\Admin\AdminInventoryController::class, 'adjust'])->name('store.inventory.adjust');
     });
 });
 
