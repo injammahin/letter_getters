@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\ChildCoinService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ class AuthenticatedSessionController extends Controller
         return view('auth.login');
     }
 
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request, ChildCoinService $coinService): RedirectResponse
     {
         $request->authenticate();
 
@@ -24,19 +25,22 @@ class AuthenticatedSessionController extends Controller
 
         $user = $request->user();
 
-        return redirect()->intended($this->redirectToByRole($user));
-    }
+        if ($user->role === 'child') {
+            $coinAnimation = $coinService->consumePendingAnimations($user);
 
-    protected function redirectToByRole($user): string
-    {
+            if ($coinAnimation) {
+                $request->session()->flash('coin_reward_animation', $coinAnimation);
+            }
+        }
+
         return match ($user->role) {
-            'superadmin', 'admin' => route('admin.dashboard'),
-            'adult' => route('adult.dashboard'),
-            'parent' => route('parent.dashboard'),
+            'superadmin', 'admin' => redirect()->intended(route('admin.dashboard')),
             'child' => $user->hasCompletedChildProfile()
-                ? route('child.dashboard')
-                : route('child.profile.complete'),
-            default => route('home'),
+                ? redirect()->intended(route('child.dashboard'))
+                : redirect()->intended(route('child.profile.complete')),
+            'adult' => redirect()->intended(route('adult.dashboard')),
+            'parent' => redirect()->intended(route('parent.dashboard')),
+            default => redirect()->intended(route('dashboard')),
         };
     }
 

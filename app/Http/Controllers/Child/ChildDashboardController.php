@@ -61,7 +61,7 @@ class ChildDashboardController extends Controller
                 ->where('status', 'approved')
                 ->whereNull('read_at')
                 ->count(),
-            'coins' => 0,
+            'coins' => (int) $child->coin_balance,
             'printables' => 0,
         ];
 

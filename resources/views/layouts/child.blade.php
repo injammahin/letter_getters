@@ -9,14 +9,17 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     @php
-        $childUser = auth()->user();
+        $childUser = auth()->user()?->loadMissing('profile.avatarLibrary');
         $childProfile = $childUser?->profile;
+        $coinRewardAnimation = session('coin_reward_animation');
+
         $header = $childHeaderData ?? [
             'unread_message_count' => 0,
             'unread_letter_count' => 0,
             'recent_messages' => collect(),
             'recent_letters' => collect(),
         ];
+
         $totalBellCount = ($header['unread_message_count'] ?? 0) + ($header['unread_letter_count'] ?? 0);
     @endphp
 
@@ -93,11 +96,39 @@
         .child-mobile-link:hover {
             transform: translateX(3px);
         }
+
+        .coin-pill {
+            box-shadow: 0 12px 26px rgba(245, 214, 123, 0.28);
+        }
+
+        .coin-burst {
+            animation: coin-burst-float 1.2s ease forwards;
+        }
+
+        @keyframes coin-burst-float {
+            0% {
+                opacity: 0;
+                transform: translateY(6px) scale(0.85);
+            }
+
+            20% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(-18px) scale(1.08);
+            }
+        }
     </style>
 </head>
 
 <body class="min-h-screen antialiased">
-    <div x-data="{ mobileMenu: false, profileOpen: false, notificationOpen: false }" class="min-h-screen">
+    <div x-data="childLayoutState({
+            currentCoins: {{ (int) ($childUser?->coin_balance ?? 0) }},
+            rewardAnimation: @js($coinRewardAnimation),
+        })" x-init="init()" class="min-h-screen">
         <header class="sticky top-0 z-40 border-b border-black/5 bg-white/90 backdrop-blur-xl">
             <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
                 <div class="flex items-center gap-3">
@@ -152,14 +183,30 @@
                         class="child-nav-link text-sm {{ request()->routeIs('child.printables') ? 'child-nav-link-active' : 'text-black/70' }}">
                         Printables
                     </a>
-
-                    <a href="{{ route('child.safety') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.safety') ? 'child-nav-link-active' : 'text-black/70' }}">
-                        Safety
-                    </a>
                 </nav>
 
                 <div class="flex items-center gap-3">
+                    <div
+                        class="hidden sm:flex items-center gap-3 rounded-full border border-[#f5d67b] bg-[#fff6d6] px-4 py-2 coin-pill">
+                        <div
+                            class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#d49b00] shadow-sm">
+                            <i class="fa-solid fa-coins"></i>
+                        </div>
+
+                        <div class="leading-none">
+                            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">Coins</p>
+
+                            <div class="mt-1 flex items-center gap-2">
+                                <span class="text-base font-black text-black" x-text="animatedCoins"></span>
+
+                                <span x-show="showCoinBurst" x-cloak
+                                    class="coin-burst text-xs font-black text-[#CB148B]">
+                                    +<span x-text="lastRewardAmount"></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="relative">
                         <button type="button" @click="notificationOpen = !notificationOpen; profileOpen = false"
                             class="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-white text-black/70">
@@ -185,14 +232,16 @@
                             <div class="mt-4 grid grid-cols-2 gap-3">
                                 <div class="rounded-2xl bg-[#fff7fc] p-4">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#CB148B]">
-                                        Unread Messages</p>
+                                        Unread Messages
+                                    </p>
                                     <p class="mt-2 text-2xl font-bold text-black">{{ $header['unread_message_count'] }}
                                     </p>
                                 </div>
 
                                 <div class="rounded-2xl bg-[#f7efff] p-4">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#620A88]">New
-                                        Letters</p>
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#620A88]">
+                                        New Letters
+                                    </p>
                                     <p class="mt-2 text-2xl font-bold text-black">{{ $header['unread_letter_count'] }}
                                     </p>
                                 </div>
@@ -295,6 +344,7 @@
                                 <i class="fa-solid fa-shop"></i>
                                 <span>Shop</span>
                             </a>
+
                             <a href="{{ route('child.store.cart.index') }}"
                                 class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]">
                                 <i class="fa-solid fa-cart-shopping"></i>
@@ -391,12 +441,6 @@
                                 <span>Printables</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
-
-                            <a href="{{ route('child.safety') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.safety') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
-                                <span>Safety</span>
-                                <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
-                            </a>
                         </nav>
                     </div>
                 </div>
@@ -409,6 +453,186 @@
             </div>
         </main>
     </div>
+
+    <script>
+        function childLayoutState(config) {
+            return {
+                mobileMenu: false,
+                profileOpen: false,
+                notificationOpen: false,
+
+                animatedCoins: Number(config.currentCoins || 0),
+                finalCoins: Number(config.currentCoins || 0),
+
+                rewardAnimation: config.rewardAnimation || null,
+                showCoinBurst: false,
+                lastRewardAmount: 0,
+
+                init() {
+                    if (!this.rewardAnimation) {
+                        return;
+                    }
+
+                    this.lastRewardAmount = Number(this.rewardAnimation.amount || 0);
+
+                    const fromBalance = Number(
+                        this.rewardAnimation.previous_balance ?? Math.max(0, this.finalCoins - this.lastRewardAmount)
+                    );
+
+                    const toBalance = Number(
+                        this.rewardAnimation.new_balance ?? this.finalCoins
+                    );
+
+                    this.animatedCoins = fromBalance;
+                    this.showCoinBurst = true;
+
+                    setTimeout(() => {
+                        this.playCoinSound();
+                        this.animateCoins(fromBalance, toBalance, 1400);
+                    }, 220);
+
+                    setTimeout(() => {
+                        this.showCoinBurst = false;
+                    }, 1800);
+                },
+
+                animateCoins(from, to, duration = 1400) {
+                    if (from === to) {
+                        this.animatedCoins = to;
+                        return;
+                    }
+
+                    const startTime = performance.now();
+
+                    const step = (now) => {
+                        const progress = Math.min((now - startTime) / duration, 1);
+                        const eased = 1 - Math.pow(1 - progress, 3);
+
+                        this.animatedCoins = Math.round(from + (to - from) * eased);
+
+                        if (progress < 1) {
+                            requestAnimationFrame(step);
+                        } else {
+                            this.animatedCoins = to;
+                        }
+                    };
+
+                    requestAnimationFrame(step);
+                },
+
+                playCoinSound() {
+                    try {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioCtx) return;
+
+                        const ctx = new AudioCtx();
+
+                        if (ctx.state === 'suspended') {
+                            ctx.resume();
+                        }
+
+                        const master = ctx.createGain();
+                        const compressor = ctx.createDynamicsCompressor();
+
+                        master.gain.value = 0.18;
+                        compressor.threshold.value = -24;
+                        compressor.knee.value = 20;
+                        compressor.ratio.value = 8;
+                        compressor.attack.value = 0.003;
+                        compressor.release.value = 0.25;
+
+                        master.connect(compressor);
+                        compressor.connect(ctx.destination);
+
+                        const now = ctx.currentTime;
+
+                        const coinDrops = 14;
+                        for (let i = 0; i < coinDrops; i++) {
+                            const t = now + (i * 0.045) + (Math.random() * 0.015);
+
+                            const baseFreq = 1400 + Math.random() * 1300;
+                            const overtoneFreq = baseFreq * (1.45 + Math.random() * 0.35);
+
+                            const osc1 = ctx.createOscillator();
+                            const osc2 = ctx.createOscillator();
+                            const gain = ctx.createGain();
+
+                            osc1.type = 'triangle';
+                            osc2.type = 'sine';
+
+                            osc1.frequency.setValueAtTime(baseFreq, t);
+                            osc2.frequency.setValueAtTime(overtoneFreq, t);
+
+                            gain.gain.setValueAtTime(0.0001, t);
+                            gain.gain.exponentialRampToValueAtTime(0.09, t + 0.008);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+
+                            osc1.connect(gain);
+                            osc2.connect(gain);
+                            gain.connect(master);
+
+                            osc1.start(t);
+                            osc2.start(t);
+                            osc1.stop(t + 0.12);
+                            osc2.stop(t + 0.12);
+                        }
+
+                        const bufferSize = ctx.sampleRate * 0.22;
+                        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                        const output = noiseBuffer.getChannelData(0);
+
+                        for (let i = 0; i < bufferSize; i++) {
+                            output[i] = (Math.random() * 2 - 1) * 0.35;
+                        }
+
+                        const noise = ctx.createBufferSource();
+                        noise.buffer = noiseBuffer;
+
+                        const bandpass = ctx.createBiquadFilter();
+                        bandpass.type = 'bandpass';
+                        bandpass.frequency.value = 4200;
+                        bandpass.Q.value = 1.2;
+
+                        const highpass = ctx.createBiquadFilter();
+                        highpass.type = 'highpass';
+                        highpass.frequency.value = 1800;
+
+                        const noiseGain = ctx.createGain();
+                        noiseGain.gain.setValueAtTime(0.0001, now + 0.05);
+                        noiseGain.gain.exponentialRampToValueAtTime(0.045, now + 0.09);
+                        noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+                        noise.connect(bandpass);
+                        bandpass.connect(highpass);
+                        highpass.connect(noiseGain);
+                        noiseGain.connect(master);
+
+                        noise.start(now + 0.04);
+                        noise.stop(now + 0.30);
+
+                        const finalBell = ctx.createOscillator();
+                        const finalGain = ctx.createGain();
+
+                        finalBell.type = 'sine';
+                        finalBell.frequency.setValueAtTime(1900, now + 0.52);
+                        finalBell.frequency.exponentialRampToValueAtTime(1200, now + 0.78);
+
+                        finalGain.gain.setValueAtTime(0.0001, now + 0.52);
+                        finalGain.gain.exponentialRampToValueAtTime(0.10, now + 0.54);
+                        finalGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.82);
+
+                        finalBell.connect(finalGain);
+                        finalGain.connect(master);
+
+                        finalBell.start(now + 0.52);
+                        finalBell.stop(now + 0.84);
+                    } catch (e) {
+                        console.warn('Coin sound could not play.', e);
+                    }
+                }
+            };
+        }
+    </script>
 </body>
 
 </html>

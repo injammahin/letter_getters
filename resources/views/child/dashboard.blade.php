@@ -53,9 +53,13 @@
                             <p class="mt-2 text-3xl font-bold text-black">{{ $child->interests->count() }}</p>
                         </div>
 
-                        <div class="rounded-2xl bg-[#f7efff] p-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-[#620A88]">Coins</p>
-                            <p class="mt-2 text-3xl font-bold text-black">{{ $dashboardStats['coins'] }}</p>
+                        <div class="child-card rounded-[28px] p-5">
+                            <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-black text-white">
+                                <i class="fa-solid fa-coins"></i>
+                            </div>
+                            <h3 class="text-lg font-bold text-black">Coins</h3>
+                            <p class="mt-3 text-4xl font-bold text-black">{{ $dashboardStats['coins'] }}</p>
+                            <p class="mt-2 text-sm text-black/55">Reward wallet</p>
                         </div>
                     </div>
                 </div>

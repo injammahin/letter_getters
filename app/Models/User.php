@@ -20,6 +20,7 @@ class User extends Authenticatable
         'account_status',
         'parent_email',
         'email_verified_at',
+        'coin_balance',
     ];
 
     protected $hidden = [
@@ -28,6 +29,7 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
+        'coin_balance' => 'integer',
         'email_verified_at' => 'datetime',
     ];
 
@@ -45,6 +47,7 @@ class User extends Authenticatable
     {
         return $this->hasMany(ParentApproval::class, 'child_user_id');
     }
+
     public function hasCompletedChildProfile(): bool
     {
         if ($this->role !== 'child') {
@@ -81,6 +84,7 @@ class User extends Authenticatable
             && $hasInterests
             && ! is_null($profile->profile_completed_at);
     }
+
     public function sentChildMatchRequests()
     {
         return $this->hasMany(ChildMatchRequest::class, 'requester_user_id');
@@ -100,6 +104,7 @@ class User extends Authenticatable
     {
         return $this->hasMany(ChildMatch::class, 'user_two_id');
     }
+
     public function parentLink()
     {
         return $this->hasOne(ParentChildLink::class, 'child_user_id');
@@ -124,6 +129,7 @@ class User extends Authenticatable
     {
         return $this->hasMany(ChildLetter::class, 'receiver_user_id');
     }
+
     public function cartItems()
     {
         return $this->hasMany(\App\Models\CartItem::class);
@@ -132,5 +138,10 @@ class User extends Authenticatable
     public function orders()
     {
         return $this->hasMany(\App\Models\Order::class);
+    }
+
+    public function coinTransactions()
+    {
+        return $this->hasMany(\App\Models\CoinTransaction::class)->latest();
     }
 }
