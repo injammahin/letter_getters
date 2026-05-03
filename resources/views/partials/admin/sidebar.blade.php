@@ -96,10 +96,10 @@
                 </div>
             </div>
 
-            <div x-data="{ open: {{ request()->is('admin/interests*') || request()->is('admin/child-avatars*') ? 'true' : 'false' }} }"
+            <div x-data="{ open: {{ request()->is('admin/interests*') || request()->is('admin/child-avatars*') || request()->is('admin/habitants*') ? 'true' : 'false' }} }"
                 class="rounded-2xl">
                 <button type="button" @click="if (desktopCollapsed) { desktopCollapsed = false } else { open = !open }"
-                    class="admin-menu-link flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/interests*') || request()->is('admin/child-avatars*') ? 'admin-menu-link-active' : 'text-black/75' }}"
+                    class="admin-menu-link flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/interests*') || request()->is('admin/child-avatars*') || request()->is('admin/habitants*') ? 'admin-menu-link-active' : 'text-black/75' }}"
                     :class="desktopCollapsed ? 'justify-center' : 'justify-between'">
                     <div class="flex items-center gap-3">
                         <i class="fa-solid fa-layer-group text-base"></i>
@@ -119,6 +119,11 @@
                     <a href="{{ route('admin.child-avatars.index') }}"
                         class="admin-submenu-link block text-sm {{ request()->is('admin/child-avatars*') ? 'admin-submenu-link-active' : 'text-black/60' }}">
                         Child Avatars
+                    </a>
+
+                    <a href="{{ route('admin.habitants.index') }}"
+                        class="admin-submenu-link block text-sm {{ request()->is('admin/habitants*') ? 'admin-submenu-link-active' : 'text-black/60' }}">
+                        Habitant Themes
                     </a>
                 </div>
             </div>
@@ -214,27 +219,40 @@
                 </div>
             </div>
 
-            <div x-data="{ open: {{ request()->is('admin/subscriptions*') ? 'true' : 'false' }} }" class="rounded-2xl">
+            <div x-data="{ open: {{ request()->routeIs('admin.subscription-plans.*') || request()->is('admin/subscriptions*') ? 'true' : 'false' }} }"
+                class="rounded-2xl">
                 <button type="button" @click="if (desktopCollapsed) { desktopCollapsed = false } else { open = !open }"
-                    class="admin-menu-link flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->is('admin/subscriptions*') ? 'admin-menu-link-active' : 'text-black/75' }}"
+                    class="admin-menu-link flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold {{ request()->routeIs('admin.subscription-plans.*') || request()->is('admin/subscriptions*') ? 'admin-menu-link-active' : 'text-black/75' }}"
                     :class="desktopCollapsed ? 'justify-center' : 'justify-between'">
                     <div class="flex items-center gap-3">
-                        <i class="fa-solid fa-box-open text-base"></i>
+                        <i class="fa-solid fa-gem text-base"></i>
                         <span x-show="!desktopCollapsed" x-cloak>Subscriptions</span>
                     </div>
+
                     <i x-show="!desktopCollapsed" x-cloak class="fa-solid fa-chevron-down text-xs transition"
                         :class="open ? 'rotate-180' : ''"></i>
                 </button>
 
                 <div x-show="open && !desktopCollapsed" x-cloak class="mt-2 space-y-2 pl-11 pr-3">
-                    <a href="{{ url('/admin/subscriptions/plans') }}"
-                        class="admin-submenu-link block text-sm text-black/60">Plans</a>
+                    <a href="{{ route('admin.subscription-plans.index') }}"
+                        class="admin-submenu-link block text-sm {{ request()->routeIs('admin.subscription-plans.*') ? 'admin-submenu-link-active' : 'text-black/60' }}">
+                        Subscription Plans
+                    </a>
+
                     <a href="{{ url('/admin/subscriptions/active') }}"
-                        class="admin-submenu-link block text-sm text-black/60">Active Subscriptions</a>
+                        class="admin-submenu-link block text-sm {{ request()->is('admin/subscriptions/active*') ? 'admin-submenu-link-active' : 'text-black/60' }}">
+                        Active Subscriptions
+                    </a>
+
                     <a href="{{ url('/admin/subscriptions/renewals') }}"
-                        class="admin-submenu-link block text-sm text-black/60">Renewals</a>
+                        class="admin-submenu-link block text-sm {{ request()->is('admin/subscriptions/renewals*') ? 'admin-submenu-link-active' : 'text-black/60' }}">
+                        Renewals
+                    </a>
+
                     <a href="{{ url('/admin/subscriptions/kit-fulfillment') }}"
-                        class="admin-submenu-link block text-sm text-black/60">Kit Fulfillment</a>
+                        class="admin-submenu-link block text-sm {{ request()->is('admin/subscriptions/kit-fulfillment*') ? 'admin-submenu-link-active' : 'text-black/60' }}">
+                        Kit Fulfillment
+                    </a>
                 </div>
             </div>
 

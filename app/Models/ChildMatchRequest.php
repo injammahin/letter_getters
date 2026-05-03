@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ChildMatchRequest extends Model
 {
@@ -15,24 +16,37 @@ class ChildMatchRequest extends Model
         'admin_notes',
         'reviewed_by',
         'reviewed_at',
+        'accepted_by',
+        'accepted_at',
+        'declined_by',
+        'declined_at',
     ];
 
     protected $casts = [
         'reviewed_at' => 'datetime',
+        'accepted_at' => 'datetime',
+        'declined_at' => 'datetime',
+        'shared_interest_count' => 'integer',
+        'score' => 'integer',
     ];
 
-    public function requester()
+    public function requester(): BelongsTo
     {
         return $this->belongsTo(User::class, 'requester_user_id');
     }
 
-    public function target()
+    public function target(): BelongsTo
     {
         return $this->belongsTo(User::class, 'target_user_id');
     }
 
-    public function reviewer()
+    public function acceptedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'reviewed_by');
+        return $this->belongsTo(User::class, 'accepted_by');
+    }
+
+    public function declinedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'declined_by');
     }
 }

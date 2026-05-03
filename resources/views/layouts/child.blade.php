@@ -5,13 +5,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', 'Child Space') - {{ config('app.name', 'Letter Getters') }}</title>
-
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     @php
         $childUser = auth()->user()?->loadMissing('profile.avatarLibrary');
         $childProfile = $childUser?->profile;
         $coinRewardAnimation = session('coin_reward_animation');
+
+        $penPalNotificationTypes = [
+            'penpal_request_received',
+            'penpal_request_accepted',
+        ];
+
+        $unreadPenPalCount = 0;
+        $recentPenPalNotifications = collect();
+
+        if ($childUser) {
+            $unreadPenPalCount = $childUser->unreadNotifications()
+                ->where(function ($query) use ($penPalNotificationTypes) {
+                    foreach ($penPalNotificationTypes as $type) {
+                        $query->orWhere('data->type', $type);
+                    }
+                })
+                ->count();
+
+                $recentPenPalNotifications = $childUser->unreadNotifications()
+                    ->where(function ($query) use ($penPalNotificationTypes) {
+                        foreach ($penPalNotificationTypes as $type) {
+                            $query->orWhere('data->type', $type);
+                        }
+                    })
+                    ->latest()
+                    ->take(5)
+                    ->get();
+        }
 
         $header = $childHeaderData ?? [
             'unread_message_count' => 0,
@@ -20,7 +48,25 @@
             'recent_letters' => collect(),
         ];
 
-        $totalBellCount = ($header['unread_message_count'] ?? 0) + ($header['unread_letter_count'] ?? 0);
+        $header['unread_penpal_count'] = $header['unread_penpal_count'] ?? $unreadPenPalCount;
+        $header['recent_penpal_notifications'] = $header['recent_penpal_notifications'] ?? $recentPenPalNotifications;
+
+        $totalBellCount =
+            ($header['unread_message_count'] ?? 0) +
+            ($header['unread_letter_count'] ?? 0) +
+            ($header['unread_penpal_count'] ?? 0);
+
+        $initialPenPalNotifications = collect($header['recent_penpal_notifications'] ?? [])->map(function ($notification) {
+            return [
+                'id' => $notification->id,
+                'title' => $notification->data['title'] ?? 'Notification',
+                'message' => $notification->data['message'] ?? '',
+                'url' => $notification->data['url'] ?? route('child.pen-pals'),
+                'icon' => $notification->data['icon'] ?? 'fa-bell',
+                'read_at' => $notification->read_at,
+                'created_at_human' => $notification->created_at?->diffForHumans(),
+            ];
+        })->values();
     @endphp
 
     <style>
@@ -125,82 +171,119 @@
 </head>
 
 <body class="min-h-screen antialiased">
-    <div x-data="childLayoutState({
+    <div
+        x-data="childLayoutState({
             currentCoins: {{ (int) ($childUser?->coin_balance ?? 0) }},
             rewardAnimation: @js($coinRewardAnimation),
-        })" x-init="init()" class="min-h-screen">
+            initialPenPalCount: {{ (int) ($header['unread_penpal_count'] ?? 0) }},
+            initialTotalBellCount: {{ (int) $totalBellCount }},
+            initialPenPalNotifications: @js($initialPenPalNotifications),
+            pollUrl: @js(route('child.notifications.poll')),
+            markReadUrl: @js(route('child.notifications.pen-pals.read')),
+        })"
+        x-init="init()"
+        class="min-h-screen"
+    >
         <header class="sticky top-0 z-40 border-b border-black/5 bg-white/90 backdrop-blur-xl">
             <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
                 <div class="flex items-center gap-3">
-                    <button type="button" @click="mobileMenu = true"
-                        class="flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-white text-black/70 lg:hidden">
+                    <button
+                        type="button"
+                        @click="mobileMenu = true"
+                        class="flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-white text-black/70 lg:hidden"
+                    >
                         <i class="fa-solid fa-bars-staggered"></i>
                     </button>
 
                     <a href="{{ route('child.dashboard') }}" class="flex items-center gap-3">
-                        <img src="{{ asset('/img/update logo.png') }}" alt="Letter Getters"
-                            class="h-12 w-12 rounded-full object-cover">
+                        <img
+                            src="{{ asset('/img/update logo.png') }}"
+                            alt="Letter Getters"
+                            class="h-12 w-12 rounded-full object-cover"
+                        >
+
                         <div class="hidden sm:block">
                             <div class="text-lg font-bold tracking-tight text-black">Letter Getters</div>
-                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">Child Space
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-black/45">
+                                Child Space
                             </div>
                         </div>
                     </a>
                 </div>
 
-                <nav class="hidden items-center gap-6 xl:gap-7 lg:flex">
-                    <a href="{{ route('child.dashboard') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.dashboard') ? 'child-nav-link-active' : 'text-black/70' }}">
+                <nav class="hidden items-center gap-5 xl:gap-6 lg:flex">
+                    <a
+                        href="{{ route('child.dashboard') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.dashboard') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
                         Home
                     </a>
 
-                    <a href="{{ route('child.profile.complete') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.profile.complete') ? 'child-nav-link-active' : 'text-black/70' }}">
+                    <a
+                        href="{{ route('child.profile.complete') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.profile.complete') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
                         Complete Profile
                     </a>
 
-                    <a href="{{ route('child.pen-pals') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.pen-pals') ? 'child-nav-link-active' : 'text-black/70' }}">
+                    <a
+                        href="{{ route('child.pen-pals') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.pen-pals') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
                         My Pen Pals
                     </a>
 
-                    <a href="{{ route('child.letters') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.letters*') ? 'child-nav-link-active' : 'text-black/70' }}">
-                        Letters
+                    <a
+                        href="{{ route('child.habitant') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.habitant') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
+                        My Habitant
                     </a>
 
-                    <a href="{{ route('child.shop') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.shop') ? 'child-nav-link-active' : 'text-black/70' }}">
+                   <a
+                        href="{{ route('child.plans') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.plans') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
+                        Plans
+                    </a>
+
+                    <a
+                        href="{{ route('child.shop') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.shop') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
                         Shop
                     </a>
 
-                    <a href="{{ route('child.rewards') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.rewards') ? 'child-nav-link-active' : 'text-black/70' }}">
+                    <a
+                        href="{{ route('child.rewards') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.rewards') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
                         Rewards
                     </a>
 
-                    <a href="{{ route('child.printables') }}"
-                        class="child-nav-link text-sm {{ request()->routeIs('child.printables') ? 'child-nav-link-active' : 'text-black/70' }}">
+                    {{-- <a
+                        href="{{ route('child.printables') }}"
+                        class="child-nav-link text-sm {{ request()->routeIs('child.printables') ? 'child-nav-link-active' : 'text-black/70' }}"
+                    >
                         Printables
-                    </a>
+                    </a> --}}
                 </nav>
 
                 <div class="flex items-center gap-3">
-                    <div
-                        class="hidden sm:flex items-center gap-3 rounded-full border border-[#f5d67b] bg-[#fff6d6] px-4 py-2 coin-pill">
-                        <div
-                            class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#d49b00] shadow-sm">
+                    <div class="hidden sm:flex items-center gap-3 rounded-full border border-[#f5d67b] bg-[#fff6d6] px-4 py-2 coin-pill">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#d49b00] shadow-sm">
                             <i class="fa-solid fa-coins"></i>
                         </div>
 
                         <div class="leading-none">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">Coins</p>
+                            <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45">
+                                Coins
+                            </p>
 
                             <div class="mt-1 flex items-center gap-2">
                                 <span class="text-base font-black text-black" x-text="animatedCoins"></span>
 
-                                <span x-show="showCoinBurst" x-cloak
-                                    class="coin-burst text-xs font-black text-[#CB148B]">
+                                <span x-show="showCoinBurst" x-cloak class="coin-burst text-xs font-black text-[#CB148B]">
                                     +<span x-text="lastRewardAmount"></span>
                                 </span>
                             </div>
@@ -208,66 +291,122 @@
                     </div>
 
                     <div class="relative">
-                        <button type="button" @click="notificationOpen = !notificationOpen; profileOpen = false"
-                            class="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-white text-black/70">
+                        <button
+                            type="button"
+                            @click="openNotifications()"
+                            class="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-black/10 bg-white text-black/70"
+                        >
                             <i class="fa-regular fa-bell"></i>
 
-                            @if($totalBellCount > 0)
-                                <span
-                                    class="absolute -right-1 -top-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#CB148B] px-1 text-[11px] font-bold text-white">
-                                    {{ $totalBellCount > 99 ? '99+' : $totalBellCount }}
-                                </span>
-                            @endif
+                            <span
+                                x-show="totalBellCount > 0"
+                                x-cloak
+                                class="absolute -right-1 -top-1 inline-flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-[#CB148B] px-1 text-[11px] font-bold text-white"
+                            >
+                                <span x-text="totalBellCount > 99 ? '99+' : totalBellCount"></span>
+                            </span>
                         </button>
 
-                        <div x-show="notificationOpen" x-cloak @click.outside="notificationOpen = false"
-                            class="absolute right-0 mt-3 w-[360px] rounded-[28px] border border-black/8 bg-white p-4 shadow-[0_24px_70px_rgba(17,17,17,0.10)]">
+                        <div
+                            x-show="notificationOpen"
+                            x-cloak
+                            @click.outside="notificationOpen = false"
+                            class="absolute right-0 mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-[28px] border border-black/8 bg-white p-4 shadow-[0_24px_70px_rgba(17,17,17,0.10)]"
+                        >
                             <div class="flex items-center justify-between gap-4">
                                 <div>
                                     <h3 class="text-sm font-bold text-black">Notifications</h3>
-                                    <p class="mt-1 text-xs text-black/45">Unread messages and approved letters</p>
+                                    <p class="mt-1 text-xs text-black/45">
+                                        Messages, letters, and pen pal updates
+                                    </p>
                                 </div>
                             </div>
 
-                            <div class="mt-4 grid grid-cols-2 gap-3">
+                            <div class="mt-4 grid grid-cols-3 gap-3">
                                 <div class="rounded-2xl bg-[#fff7fc] p-4">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#CB148B]">
-                                        Unread Messages
+                                        Messages
                                     </p>
-                                    <p class="mt-2 text-2xl font-bold text-black">{{ $header['unread_message_count'] }}
+                                    <p class="mt-2 text-2xl font-bold text-black">
+                                        {{ $header['unread_message_count'] }}
                                     </p>
                                 </div>
 
                                 <div class="rounded-2xl bg-[#f7efff] p-4">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#620A88]">
-                                        New Letters
+                                        Letters
                                     </p>
-                                    <p class="mt-2 text-2xl font-bold text-black">{{ $header['unread_letter_count'] }}
+                                    <p class="mt-2 text-2xl font-bold text-black">
+                                        {{ $header['unread_letter_count'] }}
                                     </p>
+                                </div>
+
+                                <div class="rounded-2xl bg-[#fffaf0] p-4">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                                        Pen Pals
+                                    </p>
+                                    <p class="mt-2 text-2xl font-bold text-black" x-text="unreadPenPalCount"></p>
                                 </div>
                             </div>
 
                             <div class="mt-5">
-                                <h4 class="text-xs font-semibold uppercase tracking-[0.16em] text-black/45">Unread chat
-                                    messages</h4>
+                                <h4 class="text-xs font-semibold uppercase tracking-[0.16em] text-black/45">
+                                    Pen pal updates
+                                </h4>
+
+                                <div class="mt-3 space-y-3">
+                                    <template x-if="recentPenPalNotifications.length === 0">
+                                        <div class="rounded-2xl border border-dashed border-black/8 p-3 text-xs text-black/45">
+                                            No pen pal updates.
+                                        </div>
+                                    </template>
+
+                                    <template x-for="item in recentPenPalNotifications" :key="item.id">
+                                        <a
+                                            :href="item.url"
+                                            class="block rounded-2xl border border-black/6 p-3 hover:bg-[#fffaf0]"
+                                        >
+                                            <div class="flex items-start gap-3">
+                                                <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#fff1d6] text-amber-700">
+                                                    <i class="fa-solid" :class="item.icon"></i>
+                                                </div>
+
+                                                <div>
+                                                    <p class="text-sm font-semibold text-black" x-text="item.title"></p>
+                                                    <p class="mt-1 text-xs leading-6 text-black/50" x-text="item.message"></p>
+                                                    <p class="mt-1 text-[11px] text-black/40" x-text="item.created_at_human"></p>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <div class="mt-5">
+                                <h4 class="text-xs font-semibold uppercase tracking-[0.16em] text-black/45">
+                                    Unread chat messages
+                                </h4>
 
                                 <div class="mt-3 space-y-3">
                                     @forelse($header['recent_messages'] as $messageItem)
-                                        <a href="{{ route('child.messages.chat', $messageItem->sender) }}"
-                                            class="block rounded-2xl border border-black/6 p-3 hover:bg-[#fff7fc]">
+                                        <a
+                                            href="{{ route('child.messages.chat', $messageItem->sender) }}"
+                                            class="block rounded-2xl border border-black/6 p-3 hover:bg-[#fff7fc]"
+                                        >
                                             <p class="text-sm font-semibold text-black">
                                                 New message from {{ $messageItem->sender?->name }}
                                             </p>
+
                                             <p class="mt-1 text-xs leading-6 text-black/50">
                                                 {{ \Illuminate\Support\Str::limit($messageItem->message, 70) }}
                                             </p>
+
                                             <p class="mt-1 text-[11px] text-black/40">
                                                 {{ $messageItem->created_at?->diffForHumans() }}
                                             </p>
                                         </a>
                                     @empty
-                                        <div
-                                            class="rounded-2xl border border-dashed border-black/8 p-3 text-xs text-black/45">
+                                        <div class="rounded-2xl border border-dashed border-black/8 p-3 text-xs text-black/45">
                                             No unread chat messages.
                                         </div>
                                     @endforelse
@@ -275,26 +414,30 @@
                             </div>
 
                             <div class="mt-5">
-                                <h4 class="text-xs font-semibold uppercase tracking-[0.16em] text-black/45">New approved
-                                    letters</h4>
+                                <h4 class="text-xs font-semibold uppercase tracking-[0.16em] text-black/45">
+                                    New approved letters
+                                </h4>
 
                                 <div class="mt-3 space-y-3">
                                     @forelse($header['recent_letters'] as $letterItem)
-                                        <a href="{{ route('child.letters.show', $letterItem) }}"
-                                            class="block rounded-2xl border border-black/6 p-3 hover:bg-[#f7efff]">
+                                        <a
+                                            href="{{ route('child.letters.show', $letterItem) }}"
+                                            class="block rounded-2xl border border-black/6 p-3 hover:bg-[#f7efff]"
+                                        >
                                             <p class="text-sm font-semibold text-black">
                                                 New letter from {{ $letterItem->sender?->name }}
                                             </p>
+
                                             <p class="mt-1 text-xs leading-6 text-black/50">
                                                 Subject: {{ $letterItem->subject }}
                                             </p>
+
                                             <p class="mt-1 text-[11px] text-black/40">
                                                 {{ $letterItem->created_at?->diffForHumans() }}
                                             </p>
                                         </a>
                                     @empty
-                                        <div
-                                            class="rounded-2xl border border-dashed border-black/8 p-3 text-xs text-black/45">
+                                        <div class="rounded-2xl border border-dashed border-black/8 p-3 text-xs text-black/45">
                                             No new approved letters.
                                         </div>
                                     @endforelse
@@ -304,17 +447,25 @@
                     </div>
 
                     <div class="relative">
-                        <button type="button" @click="profileOpen = !profileOpen; notificationOpen = false"
-                            class="flex items-center gap-3 rounded-2xl border border-black/10 bg-white px-3 py-2">
+                        <button
+                            type="button"
+                            @click="profileOpen = !profileOpen; notificationOpen = false"
+                            class="flex items-center gap-3 rounded-2xl border border-black/10 bg-white px-3 py-2"
+                        >
                             @if($childProfile?->avatar_type === 'upload' && $childProfile?->avatar)
-                                <img src="{{ asset('storage/' . $childProfile->avatar) }}" alt="Avatar"
-                                    class="h-11 w-11 rounded-2xl object-cover">
+                                <img
+                                    src="{{ asset('storage/' . $childProfile->avatar) }}"
+                                    alt="Avatar"
+                                    class="h-11 w-11 rounded-2xl object-cover"
+                                >
                             @elseif($childProfile?->avatar_type === 'library' && $childProfile?->avatarLibrary?->image_path)
-                                <img src="{{ asset('storage/' . $childProfile->avatarLibrary->image_path) }}" alt="Avatar"
-                                    class="h-11 w-11 rounded-2xl object-cover">
+                                <img
+                                    src="{{ asset('storage/' . $childProfile->avatarLibrary->image_path) }}"
+                                    alt="Avatar"
+                                    class="h-11 w-11 rounded-2xl object-cover"
+                                >
                             @else
-                                <div
-                                    class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#CB148B,#620A88)] text-white shadow-sm">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#CB148B,#620A88)] text-white shadow-sm">
                                     <i class="fa-solid fa-user"></i>
                                 </div>
                             @endif
@@ -325,34 +476,56 @@
                             </div>
                         </button>
 
-                        <div x-show="profileOpen" x-cloak @click.outside="profileOpen = false"
-                            class="absolute right-0 mt-3 w-64 rounded-3xl border border-black/8 bg-white p-3 shadow-[0_24px_70px_rgba(17,17,17,0.10)]">
-                            <a href="{{ route('child.profile.complete') }}"
-                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]">
+                        <div
+                            x-show="profileOpen"
+                            x-cloak
+                            @click.outside="profileOpen = false"
+                            class="absolute right-0 mt-3 w-64 rounded-3xl border border-black/8 bg-white p-3 shadow-[0_24px_70px_rgba(17,17,17,0.10)]"
+                        >
+                            <a
+                                href="{{ route('child.profile.complete') }}"
+                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]"
+                            >
                                 <i class="fa-regular fa-user"></i>
                                 <span>Edit Profile</span>
                             </a>
 
-                            <a href="{{ route('child.rewards') }}"
-                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]">
+                            <a
+                                href="{{ route('child.habitant') }}"
+                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fffaf0] hover:text-amber-700"
+                            >
+                                <i class="fa-solid fa-tree"></i>
+                                <span>My Habitant</span>
+                            </a>
+
+                            <a
+                                href="{{ route('child.rewards') }}"
+                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]"
+                            >
                                 <i class="fa-solid fa-coins"></i>
                                 <span>My Coins</span>
                             </a>
 
-                            <a href="{{ route('child.shop') }}"
-                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]">
+                            <a
+                                href="{{ route('child.shop') }}"
+                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]"
+                            >
                                 <i class="fa-solid fa-shop"></i>
                                 <span>Shop</span>
                             </a>
 
-                            <a href="{{ route('child.store.cart.index') }}"
-                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]">
+                            <a
+                                href="{{ route('child.store.cart.index') }}"
+                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]"
+                            >
                                 <i class="fa-solid fa-cart-shopping"></i>
                                 <span>Cart</span>
                             </a>
 
-                            <a href="{{ route('child.store.orders.index') }}"
-                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]">
+                            <a
+                                href="{{ route('child.store.orders.index') }}"
+                                class="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-black/75 hover:bg-[#fff7fc] hover:text-[#CB148B]"
+                            >
                                 <i class="fa-solid fa-bag-shopping"></i>
                                 <span>My Orders</span>
                             </a>
@@ -361,8 +534,11 @@
 
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <button type="submit"
-                                    class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-50">
+
+                                <button
+                                    type="submit"
+                                    class="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+                                >
                                     <i class="fa-solid fa-right-from-bracket"></i>
                                     <span>Logout</span>
                                 </button>
@@ -377,22 +553,31 @@
             <div class="absolute inset-0 bg-black/35 backdrop-blur-[2px]" @click="mobileMenu = false"></div>
 
             <div class="relative flex min-h-screen items-start justify-center px-4 pb-6 pt-5">
-                <div x-show="mobileMenu" x-transition:enter="transition ease-out duration-180"
+                <div
+                    x-show="mobileMenu"
+                    x-transition:enter="transition ease-out duration-180"
                     x-transition:enter-start="opacity-0 translate-y-2"
                     x-transition:enter-end="opacity-100 translate-y-0"
                     x-transition:leave="transition ease-in duration-140"
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-2"
-                    class="child-soft relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/70 shadow-[0_24px_70px_rgba(17,17,17,0.16)]">
+                    class="child-soft relative w-full max-w-md overflow-hidden rounded-[32px] border border-white/70 shadow-[0_24px_70px_rgba(17,17,17,0.16)]"
+                >
                     <div class="relative border-b border-black/6 px-5 pb-4 pt-5">
                         <div class="flex items-center justify-between gap-3">
-                            <a href="{{ route('child.dashboard') }}" class="flex items-center gap-3"
-                                @click="mobileMenu = false">
-                                <img src="{{ asset('/img/update logo.png') }}" alt="Letter Getters" class="h-14 w-auto">
+                            <a href="{{ route('child.dashboard') }}" class="flex items-center gap-3" @click="mobileMenu = false">
+                                <img
+                                    src="{{ asset('/img/update logo.png') }}"
+                                    alt="Letter Getters"
+                                    class="h-14 w-auto"
+                                >
                             </a>
 
-                            <button type="button" @click="mobileMenu = false"
-                                class="flex h-12 w-12 items-center justify-center rounded-full border border-black/15 bg-white text-neutral-700">
+                            <button
+                                type="button"
+                                @click="mobileMenu = false"
+                                class="flex h-12 w-12 items-center justify-center rounded-full border border-black/15 bg-white text-neutral-700"
+                            >
                                 <i class="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>
@@ -400,47 +585,77 @@
 
                     <div class="relative px-5 pb-5 pt-5">
                         <nav class="space-y-2.5">
-                            <a href="{{ route('child.dashboard') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.dashboard') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
+                            <a
+                                href="{{ route('child.dashboard') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.dashboard') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
                                 <span>Home</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
 
-                            <a href="{{ route('child.profile.complete') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.profile.complete') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
+                            <a
+                                href="{{ route('child.profile.complete') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.profile.complete') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
                                 <span>Complete Profile</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
 
-                            <a href="{{ route('child.pen-pals') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.pen-pals') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
+                            <a
+                                href="{{ route('child.pen-pals') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.pen-pals') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
                                 <span>My Pen Pals</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
 
-                            <a href="{{ route('child.letters') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.letters*') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
-                                <span>Letters</span>
+                            <a
+                                href="{{ route('child.habitant') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.habitant') ? 'bg-[#fffaf0] text-amber-700 shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
+                                <span>My Habitant</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
 
-                            <a href="{{ route('child.shop') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.shop') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
+                            <a
+                                href="{{ route('child.plans') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.plans') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
+                                <span>Plans</span>
+                                <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
+                            </a>
+
+                            <a
+                                href="{{ route('child.shop') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.shop') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
                                 <span>Shop</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
 
-                            <a href="{{ route('child.rewards') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.rewards') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
+                            <a
+                                href="{{ route('child.rewards') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.rewards') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
                                 <span>Rewards</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
                             </a>
 
-                            <a href="{{ route('child.printables') }}" @click="mobileMenu = false"
-                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.printables') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}">
+                            {{-- <a
+                                href="{{ route('child.printables') }}"
+                                @click="mobileMenu = false"
+                                class="child-mobile-link flex items-center justify-between rounded-[22px] px-5 py-4 text-lg font-medium {{ request()->routeIs('child.printables') ? 'bg-[#fbf1f9] text-[#620A88] shadow-sm' : 'text-neutral-700 hover:bg-white/80' }}"
+                            >
                                 <span>Printables</span>
                                 <i class="fa-solid fa-arrow-right text-sm opacity-50"></i>
-                            </a>
+                            </a> --}}
                         </nav>
                     </div>
                 </div>
@@ -468,32 +683,176 @@
                 showCoinBurst: false,
                 lastRewardAmount: 0,
 
-                init() {
-                    if (!this.rewardAnimation) {
+                unreadPenPalCount: Number(config.initialPenPalCount || 0),
+                totalBellCount: Number(config.initialTotalBellCount || 0),
+                previousPenPalCount: Number(config.initialPenPalCount || 0),
+                recentPenPalNotifications: config.initialPenPalNotifications || [],
+                pollUrl: config.pollUrl || null,
+                markReadUrl: config.markReadUrl || null,
+                openNotifications() {
+                    this.notificationOpen = !this.notificationOpen;
+                    this.profileOpen = false;
+
+                    if (this.notificationOpen) {
+                        this.markPenPalNotificationsAsRead();
+                    }
+                },
+
+                async markPenPalNotificationsAsRead() {
+                    if (!this.markReadUrl || this.unreadPenPalCount <= 0) {
                         return;
                     }
 
-                    this.lastRewardAmount = Number(this.rewardAnimation.amount || 0);
+                    try {
+                        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
-                    const fromBalance = Number(
-                        this.rewardAnimation.previous_balance ?? Math.max(0, this.finalCoins - this.lastRewardAmount)
-                    );
+                        const response = await fetch(this.markReadUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': token,
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({}),
+                        });
 
-                    const toBalance = Number(
-                        this.rewardAnimation.new_balance ?? this.finalCoins
-                    );
+                        if (!response.ok) {
+                            return;
+                        }
 
-                    this.animatedCoins = fromBalance;
-                    this.showCoinBurst = true;
+                        const data = await response.json();
+
+                        const messageCount = Number({{ (int) ($header['unread_message_count'] ?? 0) }});
+                        const letterCount = Number({{ (int) ($header['unread_letter_count'] ?? 0) }});
+
+                        this.unreadPenPalCount = Number(data.unread_penpal_count || 0);
+                        this.previousPenPalCount = this.unreadPenPalCount;
+                        this.totalBellCount = messageCount + letterCount + this.unreadPenPalCount;
+                    } catch (e) {
+                        console.warn('Mark notification read failed.', e);
+                    }
+                },
+
+                init() {
+                    if (this.rewardAnimation) {
+                        this.lastRewardAmount = Number(this.rewardAnimation.amount || 0);
+
+                        const fromBalance = Number(
+                            this.rewardAnimation.previous_balance ?? Math.max(0, this.finalCoins - this.lastRewardAmount)
+                        );
+
+                        const toBalance = Number(
+                            this.rewardAnimation.new_balance ?? this.finalCoins
+                        );
+
+                        this.animatedCoins = fromBalance;
+                        this.showCoinBurst = true;
+
+                        setTimeout(() => {
+                            this.playCoinSound();
+                            this.animateCoins(fromBalance, toBalance, 1400);
+                        }, 220);
+
+                        setTimeout(() => {
+                            this.showCoinBurst = false;
+                        }, 1800);
+                    }
+
+                    this.startNotificationPolling();
+                },
+
+                startNotificationPolling() {
+                    if (!this.pollUrl) {
+                        return;
+                    }
+
+                    this.pollPenPalNotifications();
+
+                    setInterval(() => {
+                        this.pollPenPalNotifications();
+                    }, 12000);
+                },
+
+                async pollPenPalNotifications() {
+                    try {
+                        const response = await fetch(this.pollUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                        });
+
+                        if (!response.ok) {
+                            return;
+                        }
+
+                        const data = await response.json();
+
+                        const newPenPalCount = Number(data.unread_penpal_count || 0);
+
+                        if (newPenPalCount > this.previousPenPalCount) {
+                            this.playCuteNotificationSound();
+                            this.showCuteNotificationToast(data.recent_penpal_notifications?.[0]);
+                        }
+
+                        const messageCount = Number({{ (int) ($header['unread_message_count'] ?? 0) }});
+                        const letterCount = Number({{ (int) ($header['unread_letter_count'] ?? 0) }});
+
+                        this.unreadPenPalCount = newPenPalCount;
+                        this.previousPenPalCount = newPenPalCount;
+                        this.totalBellCount = messageCount + letterCount + newPenPalCount;
+                        this.recentPenPalNotifications = data.recent_penpal_notifications || [];
+                    } catch (e) {
+                        console.warn('Notification polling failed.', e);
+                    }
+                },
+
+                showCuteNotificationToast(item) {
+                    if (!item) {
+                        return;
+                    }
+
+                    const toast = document.createElement('div');
+
+                    toast.className = 'fixed right-5 top-24 z-[9999] max-w-sm rounded-[24px] border border-[#ffd7ef] bg-white px-5 py-4 shadow-[0_24px_70px_rgba(17,17,17,0.14)]';
+
+                    toast.innerHTML = `
+                        <div class="flex items-start gap-3">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#fff0f9] text-[#CB148B]">
+                                <i class="fa-solid ${item.icon || 'fa-bell'}"></i>
+                            </div>
+
+                            <div>
+                                <p class="text-sm font-black text-black">${this.escapeHtml(item.title || 'New notification')}</p>
+                                <p class="mt-1 text-xs leading-6 text-black/55">${this.escapeHtml(item.message || '')}</p>
+                            </div>
+                        </div>
+                    `;
+
+                    document.body.appendChild(toast);
 
                     setTimeout(() => {
-                        this.playCoinSound();
-                        this.animateCoins(fromBalance, toBalance, 1400);
-                    }, 220);
+                        toast.style.transition = 'all 300ms ease';
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateY(-8px)';
+                    }, 3500);
 
                     setTimeout(() => {
-                        this.showCoinBurst = false;
-                    }, 1800);
+                        toast.remove();
+                    }, 3900);
+                },
+
+                escapeHtml(value) {
+                    return String(value)
+                        .replaceAll('&', '&amp;')
+                        .replaceAll('<', '&lt;')
+                        .replaceAll('>', '&gt;')
+                        .replaceAll('"', '&quot;')
+                        .replaceAll("'", '&#039;');
                 },
 
                 animateCoins(from, to, duration = 1400) {
@@ -520,10 +879,61 @@
                     requestAnimationFrame(step);
                 },
 
+                playCuteNotificationSound() {
+                    try {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+
+                        if (!AudioCtx) {
+                            return;
+                        }
+
+                        const ctx = new AudioCtx();
+
+                        if (ctx.state === 'suspended') {
+                            ctx.resume();
+                        }
+
+                        const master = ctx.createGain();
+                        master.gain.value = 0.16;
+                        master.connect(ctx.destination);
+
+                        const now = ctx.currentTime;
+
+                        const notes = [
+                            { frequency: 880, start: 0.00, duration: 0.11 },
+                            { frequency: 1175, start: 0.12, duration: 0.12 },
+                            { frequency: 1568, start: 0.25, duration: 0.18 },
+                        ];
+
+                        notes.forEach((note) => {
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+
+                            osc.type = 'sine';
+                            osc.frequency.setValueAtTime(note.frequency, now + note.start);
+
+                            gain.gain.setValueAtTime(0.0001, now + note.start);
+                            gain.gain.exponentialRampToValueAtTime(0.11, now + note.start + 0.015);
+                            gain.gain.exponentialRampToValueAtTime(0.0001, now + note.start + note.duration);
+
+                            osc.connect(gain);
+                            gain.connect(master);
+
+                            osc.start(now + note.start);
+                            osc.stop(now + note.start + note.duration + 0.03);
+                        });
+                    } catch (e) {
+                        console.warn('Notification sound could not play.', e);
+                    }
+                },
+
                 playCoinSound() {
                     try {
                         const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                        if (!AudioCtx) return;
+
+                        if (!AudioCtx) {
+                            return;
+                        }
 
                         const ctx = new AudioCtx();
 
@@ -547,6 +957,7 @@
                         const now = ctx.currentTime;
 
                         const coinDrops = 14;
+
                         for (let i = 0; i < coinDrops; i++) {
                             const t = now + (i * 0.045) + (Math.random() * 0.015);
 

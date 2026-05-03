@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ChildMatch extends Model
 {
@@ -19,22 +20,17 @@ class ChildMatch extends Model
         'approved_at' => 'datetime',
     ];
 
-    public function userOne()
+    public function userOne(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_one_id');
     }
 
-    public function userTwo()
+    public function userTwo(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_two_id');
     }
 
-    public function approvedRequest()
-    {
-        return $this->belongsTo(ChildMatchRequest::class, 'approved_request_id');
-    }
-
-    public function approver()
+    public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
     }

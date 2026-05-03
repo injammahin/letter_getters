@@ -144,4 +144,24 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\CoinTransaction::class)->latest();
     }
+    public function subscriptions()
+{
+    return $this->hasMany(\App\Models\UserSubscription::class)->latest();
+}
+
+public function activePremiumSubscription()
+{
+    return $this->subscriptions()
+        ->where('status', 'active')
+        ->where(function ($query) {
+            $query->whereNull('ends_at')
+                ->orWhere('ends_at', '>', now());
+        })
+        ->first();
+        }
+
+        public function hasPremiumAccess(): bool
+        {
+            return (bool) $this->activePremiumSubscription();
+        }
 }
